@@ -2,9 +2,11 @@
 extern crate rbatis;
 
 use std::collections::HashMap;
+use std::env;
 use std::sync::atomic::{AtomicI64, Ordering};
 use tokio::sync::Mutex;
 use chashmap::CHashMap;
+use fast_log::fast_log::exit;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use lazy_static::lazy_static;
@@ -21,27 +23,34 @@ lazy_static! {
 }
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    init_db().await;
+///mysql://test22:test2021!%40%23@rm-j6cpqm7zm633224ey8o.mysql.rds.aliyuncs.com:3306/cs1
+async fn main() {
+    let args: Vec<String> = env::args().collect();
+    println!("{:?}", args);
+    let url = args.get(1);
+    if url.is_none() {
+        println!("请输入mysql地址格式如下,有特殊字符请转义：『mysql://用户名:密码@host:3306/数据库』");
+        return;
+    }
+    init_db(url.unwrap()).await;
     let mut handles = Vec::with_capacity(20);
     for i in 0..40 {
         handles.push(tokio::spawn(run_loop()));
     }
     for handle in handles {
-        handle.await?;
+        handle.await;
     }
-    println!("{}","全部任务结束");
-    Ok(())
+    println!("{}", "全部任务结束");
 }
 
-async fn run_loop(){
+async fn run_loop() {
     loop {
         let max = run_with_start_id().await;
-        if max==-1 {
+        if max == -1 {
             break;
         }
     }
-    println!("{}","子任务结束");
+    println!("{}", "子任务结束");
 }
 
 #[crud_table]
@@ -54,10 +63,10 @@ pub struct TbUser {
     pub createtime: Option<i64>,
 }
 
-async fn init_db() {
+async fn init_db(url: &String) {
     let mut opt = DBPoolOptions::new();
     opt.max_connections = 100;
-    RB.link_opt("mysql://test22:test2021!%40%23@rm-j6cpqm7zm633224ey8o.mysql.rds.aliyuncs.com:3306/cs1", opt).await.unwrap();
+    RB.link_opt(url.as_str(), opt).await.unwrap();
 }
 
 async fn find_by_id(id: i64) -> Option<TbUser> {
@@ -82,7 +91,7 @@ async fn find_by_id(id: i64) -> Option<TbUser> {
 }
 
 async fn count_null_tree_path() -> i64 {
-    let wrapper=RB.new_wrapper().is_null("treepath");
+    let wrapper = RB.new_wrapper().is_null("treepath");
     RB.fetch_count_by_wrapper::<TbUser>(wrapper).await.unwrap() as i64
 }
 
@@ -94,12 +103,12 @@ async fn find_null_tree_path(id: i64) -> Vec<TbUser> {
 async fn run_with_start_id() -> i64 {
     let mut ids: Vec<i64> = Vec::new();
     let mut save_ids: Vec<i64> = Vec::new();
-    let mut saves: HashMap<i64,TbUser> = HashMap::new();
+    let mut saves: HashMap<i64, TbUser> = HashMap::new();
     let mut max_id = -1;
     let path_null_user_list: Vec<TbUser>;
     {
         let mut start_id = LOCK.lock().await;
-        if *start_id==-1 {
+        if *start_id == -1 {
             return -1;
         }
         println!("Task 任务区间开始于:{}", start_id);
@@ -137,7 +146,7 @@ async fn run_with_start_id() -> i64 {
     max_id
 }
 
-fn get_tree_path(id: i64, saves: &mut HashMap<i64,TbUser>) -> BoxFuture<String> {
+fn get_tree_path(id: i64, saves: &mut HashMap<i64, TbUser>) -> BoxFuture<String> {
     async move {
         let mut result: String = String::from("0");
         if id == 0 {
@@ -155,7 +164,7 @@ fn get_tree_path(id: i64, saves: &mut HashMap<i64,TbUser>) -> BoxFuture<String> 
                     result = get_tree_path(user.agentid.unwrap(), saves).await + "-" + user.agentid.unwrap().to_string().as_str();
                 }
                 user.treepath = Some(result.clone());
-                saves.insert(user.id.unwrap(),user);
+                saves.insert(user.id.unwrap(), user);
             }
             _ => result = String::from("NULL")
         }
