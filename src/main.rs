@@ -23,10 +23,9 @@ lazy_static! {
 }
 
 #[tokio::main]
-///mysql://test22:test2021!%40%23@rm-j6cpqm7zm633224ey8o.mysql.rds.aliyuncs.com:3306/cs1
+///mysql://test22:test2021%21%40%23@rm-j6cpqm7zm633224ey8o.mysql.rds.aliyuncs.com:3306/cs1
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    println!("{:?}", args);
     let url = args.get(1);
     if url.is_none() {
         println!("请输入mysql地址格式如下,有特殊字符请转义：『mysql://用户名:密码@host:3306/数据库』");
@@ -63,10 +62,10 @@ pub struct TbUser {
     pub createtime: Option<i64>,
 }
 
-async fn init_db(url: &String) {
+async fn init_db(url: &str) {
     let mut opt = DBPoolOptions::new();
     opt.max_connections = 100;
-    RB.link_opt(url.as_str(), opt).await.unwrap();
+    RB.link_opt(url, opt).await.unwrap();
 }
 
 async fn find_by_id(id: i64) -> Option<TbUser> {
